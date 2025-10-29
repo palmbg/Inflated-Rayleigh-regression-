@@ -1,0 +1,140 @@
+
+function [coef, mu_hat, resid, pvalues, vcov, stderror, aic, bic, R2] = rrfit(x11,x22,y)
+
+y1 = ones(size(y,1),1);
+x1 = [y1 x11]; 
+
+%r = size(x1,2);
+n = size(y,1);
+
+ystar = y;
+ y_null = sort(ystar);
+ n_null = sum(y==0);
+ for i = 1:n
+ if(y(i,1)~=0)
+     ystar(i,1) = log(y(i,1));
+ else
+     ystar(i,1) = log(y_null(n_null+1,1));
+ end
+ end
+
+x2 = [y1 x22];
+
+reg = regress(ystar,x2);
+ini = [zeros(1,size(x1,2)) reg']; % chute inicial
+
+loglik = makeloglik(x1, x2, y);
+options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'Display', 'notify');
+[opt2,fval,exitflag,output,grad,hessian] = fminunc(loglik, ini, options);
+%exitflag
+%if(exitflag ~= 1)
+
+m = size(x1,2);
+
+coef1 = opt2(1,1:m);
+coef2 = opt2(1,m+1:size(opt2,2));
+
+coef = [coef1 coef2];
+
+eta_hat1 = x1 * coef1';
+eta_hat2 = x2 * coef2';
+
+lambda_hat = exp(eta_hat1)./(1+exp(eta_hat1));
+mu_hat = exp(eta_hat2);
+
+
+a1 = diag((1./(lambda_hat .* (1-lambda_hat))));
+a2 = diag(4./(mu_hat.^2));
+
+t1 = 1./(lambda_hat.*(1-lambda_hat));
+t2 = 1./mu_hat;
+
+T1 = diag(1./t1);
+T2 = diag(1./t2);
+
+W1 = a1 * T1.^2;
+W2 = a2 * T2.^2;
+
+K1 = (x1' * W1 * x1);
+K2 = (x2' * W2 * x2);
+
+K11 = zeros(size(K1,1), size(K2,2));
+K22 = zeros(size(K2,1), size(K1,2));
+
+K = [K1 K11; K22 K2];
+
+%K = hessian;
+
+%vcov = inv(chol(K)) * (inv(chol(K)))';
+
+vcov = inv(K)';
+
+%  try
+%  vcov = inv(chol(K)) * (inv(chol(K)))';
+%  catch
+%      vcov = inv(chol(hessian)) * (inv(chol(hessian)))';
+%  end
+
+ru0 = (1-lambda_hat).*rand(n,1);
+ui = (1-lambda_hat).*pr(y,lambda_hat,mu_hat);
+
+for i = 1:n
+    if(y(i,1)==0)
+        ui(i,1)=ru0(i,1);
+    end
+
+end
+
+resid = norminv(ui);
+
+%var_y = (mu_hat.^2)*(4/pi -1)';
+
+%resid = (y-mu_hat)./sqrt(var_y);
+
+stderror = sqrt(diag(vcov));
+
+zstat = abs(coef./stderror');
+
+pvalues = 2*(1 - normcdf(zstat));
+
+aic = 2.*fval+2.*(size(ini,2));
+
+bic = 2.*fval+log(n).*(size(ini,2));
+
+ini2 =  double([mean(lambda_hat) mean(mu_hat)]);
+
+loglik1 = logliknull(y);
+options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'Display', 'none');
+[x,fval1] = fminunc(loglik1, ini2, options);
+
+
+R2 = 1 - exp(2./n .* (fval1 - fval));
+
+if(R2 < 0)
+
+    R2 = 1 - fval/fval1;
+
+end
+
+
+
+%1-exp((-2/n)*(fval-fval1))
+
+% else
+% 
+%     coef = 0;
+%     mu_hat = 0;
+%     resid = 0;
+%     pvalues = 0;
+%     vcov = 0;
+%     stderror = 0;
+%     aic = 0;
+%     bic = 0;
+%     R2 = 0;
+% 
+% 
+% end
+
+end
+
+   

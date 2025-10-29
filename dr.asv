@@ -1,0 +1,26 @@
+function d = dr(x,mu) % density function
+
+     n1 = size(x);
+        n = n1(1,2);
+
+        xx = sum(sum(x==0));
+
+        lambda = xx./n;
+%         y1 = 0;
+        y2 = [];
+
+        for i = 1:n
+            if(y(1,i) ~= 0)
+                y2 = [y2 y(1,i)];
+                
+            end
+        end
+
+        d1 = pi.*y2./(2.*mu.^2).*exp(-(pi.*(y2.^2)) ./(4.*mu.^2));
+
+            f1 = lambda;
+            f2 = (1-lambda).*dr1(y2,mu);
+
+        d = f1+f2;
+  
+   end 
